@@ -2,8 +2,13 @@
   "name": "stremio-ps5-bridge",
   "version": "1.0.0",
   "private": true,
-  "description": "Torrent -> HTTP stream bridge for the Stremio PS5 webapp",
+  "type": "module",
+  "description": "Torrent -> HTTP bridge for the Stremio PS5 web app",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "dependencies": { "webtorrent": "^2.4.0" }
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "webtorrent": "^2.4.0"
+  }
 }

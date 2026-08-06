@@ -7,7 +7,9 @@ const Stremio = (() => {
   const API_BASE = "https://api.strem.io/api";
 
   const DEFAULTS = {
-    bridge: "",                                  /* e.g. http://192.168.1.20:9001 */
+    bridge: "",                                  /* e.g. 192.168.1.20:9001 */
+    corsProxy: "https://api.allorigins.win/raw?url=", /* fallback only, empty = off */
+    auth: null,
     addons: [
       { id: "cinemeta",  name: "Cinemeta",  base: "https://v3-cinemeta.strem.io", streams: false },
       { id: "torrentio", name: "Torrentio", base: "https://torrentio.strem.fun",  streams: true  },
@@ -22,20 +24,40 @@ const Stremio = (() => {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch (e) {}
   }
 
+  function normalizeBridge(b) {
+    b = (b || "").trim().replace(/\/+$/, "");
+    if (b && !/^https?:\/\//i.test(b)) b = "http://" + b;
+    return b;
+  }
+
   async function getJSON(url, timeout) {
     const t = timeout || 15000;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), t);
-    let res;
-    try {
-      res = await fetch(url, { signal: ctrl.signal });
-    } catch (e) {
-      throw new Error("network: " + url);
-    } finally {
-      clearTimeout(timer);
+    const proxy = (loadSettings().corsProxy || "").trim();
+
+    async function request(u) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), t);
+      try {
+        const res = await fetch(u, { signal: ctrl.signal });
+        if (!res.ok) throw new Error("HTTP " + res.status + " " + u);
+        return await res.json();
+      } catch (err) {
+        if (err.name === "AbortError") throw new Error("timeout: " + u);
+        if (err.message.indexOf("HTTP ") === 0) throw err;
+        throw new Error("network: " + u);
+      } finally {
+        clearTimeout(timer);
+      }
     }
-    if (!res.ok) throw new Error("HTTP " + res.status + " " + url);
-    return res.json();
+
+    try {
+      return await request(url);
+    } catch (err) {
+      if (proxy && (err.message.indexOf("network:") === 0 || err.message.indexOf("timeout:") === 0)) {
+        return await request(proxy + encodeURIComponent(url));
+      }
+      throw err;
+    }
   }
 
   /* /catalog/{type}/{id}/{extra}.json  (extra: k=v&k=v) */
@@ -58,6 +80,17 @@ const Stremio = (() => {
   }
   async function manifest(base) {
     return getJSON(base + "/manifest.json");
+  }
+
+  const manifestCache = {};
+  async function supports(base, resource) {
+    if (!(base in manifestCache)) {
+      manifestCache[base] = manifest(base).then(m => m, () => null);
+    }
+    const m = await manifestCache[base];
+    if (!m) return null;
+    const res = m.resources || [];
+    return res.some(r => (typeof r === "string" ? r : (r && r.name)) === resource);
   }
 
   async function apiPost(path, body, timeout) {
@@ -135,8 +168,8 @@ const Stremio = (() => {
   }
 
   return {
-    DEFAULTS, loadSettings, saveSettings, getJSON,
-    catalog, catalogUrl, meta, streams, manifest,
+    DEFAULTS, loadSettings, saveSettings, normalizeBridge, getJSON,
+    catalog, catalogUrl, meta, streams, manifest, supports,
     apiPost, accountLogin, accountAddons, fromAccountAddon,
     episodeId, parseEpisodeId, sortStreams,
   };

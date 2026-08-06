@@ -26,19 +26,24 @@ const Input = (() => {
     if (handler) { try { handler(action, e); } catch (err) { console.error(err); } }
   }
 
-  /* Hold-to-repeat throttle, like svtplay's 90ms. */
+  /* Debug counters, shown in Diagnostics so you can verify the pad on PS5. */
+  const stats = { keydowns: 0, lastKey: "", lastAction: "" };
+  if (typeof window !== "undefined") window.InputStats = stats;
+
+  /* Hold-to-repeat throttle (svtplay uses ~90ms). */
   const REPEAT_MS = 90;
   const lastEmit = {};
   addEventListener("keydown", (e) => {
     const code = e.keyCode || e.which || 0;
     const key = (e.key || e.code || "").toLowerCase();
     const action = KEYCODE[code] || KEYNAME[key];
+    stats.keydowns++;
+    stats.lastKey = code ? (code + (key ? ":" + key : "")) : (key || "?");
     if (!action) return;
     const now = Date.now();
-    if (e.repeat || (lastEmit[action] && now - lastEmit[action] < REPEAT_MS)) {
-      if (now - lastEmit[action] < REPEAT_MS) return;
-    }
+    if (lastEmit[action] && (now - lastEmit[action] < REPEAT_MS)) return;
     lastEmit[action] = now;
+    stats.lastAction = action;
     e.preventDefault();
     emit(action, e);
   }, true);
@@ -47,7 +52,13 @@ const Input = (() => {
   const Focus = {
     items: [], idx: -1,
     set(list) {
-      this.items = (list || []).filter(el => el && el.offsetParent !== null);
+      let arr = [];
+      if (list) {
+        if (Array.isArray(list)) arr = list;
+        else if (typeof list.length === "number") arr = Array.prototype.slice.call(list);
+        else arr = [list];
+      }
+      this.items = arr.filter(el => el && el.offsetParent !== null);
       if (!this.items.length) { this.idx = -1; return; }
       if (this.idx < 0 || this.idx >= this.items.length) this.idx = 0;
       this.place();

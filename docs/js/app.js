@@ -225,27 +225,56 @@ const App = (() => {
   }
 
   /* ---------- STREAMS ---------- */
-  async function showStreams(a) {
+  async function showStreams(args) {
     clear();
-    root.appendChild(el("h2", "title", a.name));
+    const v = el("div", "view");
+    root.appendChild(v);
+    v.appendChild(el("h2", "title", args.name));
     const list = el("div", "streamlist");
-    root.appendChild(list);
-    root.appendChild(tile("‹ Back", "backtile", () => back()));
+    v.appendChild(list);
+    hudMsg("Loading streams…", 2000);
 
-    for (const addon of settings.addons) {
-      if (!addon.streams) continue;
-      const group = el("div", "sgroup");
-      group.appendChild(el("h3", "sub", addon.name));
+    const bridge = Stremio.normalizeBridge(settings.bridge);
+    const results = [];
+    const errors = [];
+
+    const fetchOne = async (a) => {
       try {
-        const ss = await Stremio.streams(addon.base, a.type, a.id);
-        for (const s of Stremio.sortStreams(ss)) group.appendChild(streamRow(s, a, addon));
-        if (!ss.length) group.appendChild(el("div", "hint", "No streams from this addon."));
-      } catch (e) {
-        group.appendChild(el("div", "hint", "Error: " + e.message));
+        const sup = await Stremio.supports(a.base, "stream");
+        if (sup === false) return;
+        const ss = await Stremio.streams(a.base, args.type, args.id, 12000);
+        if (ss && ss.length) results.push({ addon: a, streams: Stremio.sortStreams(ss) });
+      } catch (e) { errors.push(a.name + " — " + e.message); }
+    };
+    await Promise.all(settings.addons.map(a => fetchOne(a).catch(() => {})));
+
+    if (!results.length) {
+      list.appendChild(el("div", "diag",
+        errors.length ? "No streams found.\n" + errors.join("\n") : "No streams found."));
+    } else {
+      for (const { addon, streams } of results) {
+        list.appendChild(el("div", "addonhead", addon.name));
+        for (const s of streams) {
+          const label = s.title || s.name || "Stream";
+          let onclick = null;
+          if (s.url) {
+            onclick = () => go("player", { src: s.url, name: args.name });
+          } else if (s.infoHash) {
+            if (!bridge) {
+              list.appendChild(el("div", "diag", label + "  (set torrent bridge in ⚙ Settings)"));
+              continue;
+            }
+            const src = bridge + "/stream/" + s.infoHash +
+                        (s.fileIdx != null ? "?file=" + s.fileIdx : "");
+            onclick = () => go("player", { src: src, name: args.name });
+          } else { continue; }
+          const t = tile(label, "key", onclick || (() => hudMsg("No playable stream.", 2500)));
+          list.appendChild(t);
+        }
       }
-      list.appendChild(group);
     }
-    Input.Focus.set(list.querySelectorAll("[data-focus]"));
+    v.appendChild(tile("‹ Back", "backtile", () => back()));
+    Input.Focus.set(v.querySelectorAll("[data-focus]"));
   }
 
   function streamRow(s, a, addon) {
@@ -342,15 +371,20 @@ const App = (() => {
     v.appendChild(el("h3", "sub", "Torrent bridge (for Torrentio streams)"));
     const bridge = el("input", "searchbox");
     bridge.value = settings.bridge || "";
-    bridge.placeholder = "http://192.168.1.20:9001";
+    bridge.placeholder = "192.168.1.5:9001";
     v.appendChild(bridge);
     v.appendChild(keypad(bridge, saveBridge));
 
-    const acc = Stremio.loadSettings().auth;          // { authKey } persisted
-    const loggedIn = acc && acc.authKey;
+    v.appendChild(el("h3", "sub", "CORS proxy (fallback for blocked addons)"));
+    const proxy = el("input", "searchbox");
+    proxy.value = settings.corsProxy || "";
+    proxy.placeholder = "https://api.allorigins.win/raw?url=  (empty = off)";
+    v.appendChild(proxy);
+    v.appendChild(keypad(proxy, saveProxy));
 
-    v.appendChild(el("h3", "sub", loggedIn ? "Stremio account" : "Login to Stremio"));
-    if (loggedIn) {
+    const acc = settings.auth;
+    v.appendChild(el("h3", "sub", acc && acc.authKey ? "Stremio account" : "Login to Stremio"));
+    if (acc && acc.authKey) {
       const row = el("div", "addonrow");
       row.appendChild(el("span", "", "Logged in"));
       row.appendChild(tile("Load my addons", "key", async () => {
@@ -363,7 +397,9 @@ const App = (() => {
         } catch (e) { hudMsg("Addons failed: " + e.message, 4000); }
       }));
       row.appendChild(tile("Log out", "key", () => {
-        settings.auth = null; Stremio.saveSettings(settings); show("settings");
+        settings.auth = null;
+        Stremio.saveSettings(settings);
+        show("settings");
       }));
       v.appendChild(row);
     } else {
@@ -411,8 +447,9 @@ const App = (() => {
     }
     v.appendChild(alist);
 
-    const saveBtn = tile("💾 Save", "bigbtn", () => {
-      settings.bridge = bridge.value.trim();
+    const saveBtn = tile("Save", "bigbtn", () => {
+      settings.bridge = Stremio.normalizeBridge(bridge.value);
+      settings.corsProxy = (proxy.value || "").trim();
       Stremio.saveSettings(settings);
       hudMsg("Saved.", 2000);
       back();
@@ -422,9 +459,15 @@ const App = (() => {
     Input.Focus.set(v.querySelectorAll("[data-focus]"));
   }
   function saveBridge(val) {
-    settings.bridge = val.trim();
+    settings.bridge = Stremio.normalizeBridge(val);
     Stremio.saveSettings(settings);
     hudMsg("Bridge saved: " + (settings.bridge || "(none)"), 2500);
+    show("settings");
+  }
+  function saveProxy(val) {
+    settings.corsProxy = (val || "").trim();
+    Stremio.saveSettings(settings);
+    hudMsg("CORS proxy " + (settings.corsProxy ? "saved." : "off."), 2500);
     show("settings");
   }
 
@@ -438,16 +481,17 @@ const App = (() => {
     const v = el("div", "view");
     root.appendChild(v);
     v.appendChild(el("h2", "title", "Diagnostics"));
+    const ist = window.InputStats || {};
     const rows = [
       ["WebAssembly", typeof WebAssembly !== "undefined" ? "present (unexpected on PS5)" : "absent — expected, app does not need it"],
       ["MSE (MediaSource)", typeof MediaSource !== "undefined" ? "present" : "absent"],
       ["HLS native", canPlay("application/vnd.apple.mpegurl")],
       ["MP4 / H.264", canPlay('video/mp4; codecs="avc1.42E01E, mp4a.40.2"')],
       ["WebM / VP9", canPlay('video/webm; codecs="vp9"')],
-      ["WebRTC", typeof RTCPeerConnection !== "undefined" ? "present" : "absent"],
       ["Gamepad API", typeof navigator.getGamepads === "function" ? "present" : "absent"],
-      ["Fetch", typeof fetch === "function" ? "present" : "absent"],
+      ["Input events", (ist.keydowns || 0) + " keydowns · last: " + (ist.lastAction || ist.lastKey || "-")],
       ["Bridge", settings.bridge || "(not set)"],
+      ["CORS proxy", settings.corsProxy || "(off)"],
     ];
     for (const [k, val] of rows) v.appendChild(el("div", "diag", k + ": " + val));
     v.appendChild(tile("‹ Back", "backtile", () => back()));
