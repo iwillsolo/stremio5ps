@@ -1,0 +1,40 @@
+name: Build payload ELF
+
+on:
+  push:
+    branches: [main]
+    paths: ['install.c', 'Makefile', 'sce_sys/**', 'tools/**', '.github/workflows/build-elf.yml']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate icon
+        run: python3 tools/make-icon.py
+
+      - name: Install prebuilt PS5 payload SDK (pacbrew)
+        run: |
+          wget -q https://github.com/ps5-payload-dev/pacbrew-repo/releases/latest/download/ps5-payload-dev.tar.gz
+          sudo tar xf ps5-payload-dev.tar.gz -C /
+          ls /opt/ps5-payload-sdk/bin  # sanity check
+
+      - name: Build payload
+        env:
+          PS5_PAYLOAD_SDK: /opt/ps5-payload-sdk
+        run: make
+
+      - name: Verify ELF
+        run: file stremio-install.elf && ls -l stremio-install.elf
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stremio-install.elf
+          path: stremio-install.elf
+          if-no-files-found: error
