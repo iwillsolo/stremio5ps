@@ -1,5 +1,6 @@
 /*
- * stremio-install - installs the Stremio webapp launcher on a jailbroken PS5.
+ * stremio-install - installs the Stremio webapp launcher on a jailbroken PS5
+ * and then serves the webapp UI from the PS5 itself (BFpilot-style).
  *
  * Derived from ps5-payload-dev/svtplay (C) 2026 John Törnblom, GPLv3+.
  * This program is free software; you can redistribute it and/or modify it
@@ -16,6 +17,8 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <ps5/kernel.h>
+
+#include "websrv_lite.h"
 
 #define IOVEC_SIZE(x) (sizeof(x) / sizeof(struct iovec))
 #define IOVEC_ENTRY(x) {x ? x : 0, x ? strlen(x)+1 : 0}
@@ -140,5 +143,8 @@ main(int argc, char* argv[]) {
         return -1;
     }
 
-    return 0;
+    printf("stremio webapp installed.\n");
+    printf("serving UI at http://127.0.0.1:%u/ - keep this payload running.\n",
+           (unsigned)WEB_PORT);
+    return webserver_run(WEB_PORT);   /* blocks forever; serves the app */
 }
