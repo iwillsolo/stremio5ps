@@ -372,15 +372,15 @@ const App = (() => {
     const bridge = el("input", "searchbox");
     bridge.value = settings.bridge || "";
     bridge.placeholder = "192.168.1.5:9001";
+    bridge.setAttribute("data-focus", "");
     v.appendChild(bridge);
-    v.appendChild(keypad(bridge, saveBridge));
 
     v.appendChild(el("h3", "sub", "CORS proxy (fallback for blocked addons)"));
     const proxy = el("input", "searchbox");
     proxy.value = settings.corsProxy || "";
     proxy.placeholder = "https://api.allorigins.win/raw?url=  (empty = off)";
+    proxy.setAttribute("data-focus", "");
     v.appendChild(proxy);
-    v.appendChild(keypad(proxy, saveProxy));
 
     const acc = settings.auth;
     v.appendChild(el("h3", "sub", acc && acc.authKey ? "Stremio account" : "Login to Stremio"));

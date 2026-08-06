@@ -34,6 +34,17 @@ const Input = (() => {
   const REPEAT_MS = 90;
   const lastEmit = {};
   addEventListener("keydown", (e) => {
+    /* PS5 native OSK active: hands off, or Backspace triggers "back"
+     * and arrow keys get eaten. Only Escape closes the keyboard. */
+    const t = e.target;
+    const editing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+    if (editing) {
+      if (e.keyCode === 27 || (e.key || "").toLowerCase() === "escape") {
+        e.preventDefault();
+        t.blur();                    /* first Escape: close OSK, leave the field */
+      }
+      return;                        /* everything else goes to the field */
+    }
     const code = e.keyCode || e.which || 0;
     const key = (e.key || e.code || "").toLowerCase();
     const action = KEYCODE[code] || KEYNAME[key];
@@ -89,7 +100,15 @@ const Input = (() => {
       }
       if (best >= 0) { this.idx = best; this.place(); }
     },
-    activate() { const el = this.current(); if (el && el.click) el.click(); },
+    activate() {
+      const el = this.current();
+      if (!el) return;
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+        el.focus();                  /* summons the PS5 on-screen keyboard */
+      } else if (el.click) {
+        el.click();
+      }
+    },
     indexOf(el) { return this.items.indexOf(el); },
     center(el) {
       const r = el.getBoundingClientRect();
