@@ -23,7 +23,7 @@ const App = (() => {
 
   /* ---------- navigation ---------- */
   function go(view, args) { state.stack.push({ view: state.view, args: state.args }); show(view, args); }
-  function back() { const p = state.stack.pop(); if (p) show(p.view, p.args); }
+  function back() { const p = state.stack.pop(); if (p) return show(p.view, p.args); show("home"); }
   function show(view, args) {
     state.view = view; state.args = args;
     const fn = view === "home" ? showHome : view === "catalog" ? showCatalog
@@ -82,7 +82,7 @@ const App = (() => {
     utils.appendChild(el("h3", "sub", "Stremio"));
     const row = el("div", "cards");
     row.appendChild(tile("🔍 Search", "util", () => show("search")));
-    row.appendChild(tile("⚙ Settings", "util", () => show("settings")));
+    row.appendChild(tile("⚙ Settings", "util", () => go("settings")));
     row.appendChild(tile("ℹ Diagnostics", "util", () => show("diag")));
     utils.appendChild(row);
     wrap.appendChild(utils);
