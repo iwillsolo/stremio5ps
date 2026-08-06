@@ -163,7 +163,7 @@ const App = (() => {
       const metas = await Stremio.catalog(CINEMETA, a.type, a.id, extra);
       for (const it of metas) grid.appendChild(card(it, () => go("detail", { type: a.type, id: it.id })));
       if (metas.length >= 20) {
-        grid.appendChild(tile("More ▸", "more", () => go("catalog", Object.assign({}, a, { skip: (a.skip || 20) + 20 })));
+        grid.appendChild(tile("More ▸", "more", () => go("catalog", Object.assign({}, a, { skip: (a.skip || 20) + 20 }))));
       }
     } catch (e) {
       grid.appendChild(el("div", "hint", "Could not load: " + e.message));
