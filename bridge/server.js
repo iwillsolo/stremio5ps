@@ -90,6 +90,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   const infoHash = match[1].toLowerCase();
+
+  console.log("Incoming hash:", infoHash);
+  console.log("Magnet:", `magnet:?xt=urn:btih:${infoHash}`);
   const fileIdx = match[2] !== undefined ? Number(match[2]) : null;
 
   try {
