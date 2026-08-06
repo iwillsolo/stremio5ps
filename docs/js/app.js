@@ -346,6 +346,56 @@ const App = (() => {
     v.appendChild(bridge);
     v.appendChild(keypad(bridge, saveBridge));
 
+    const acc = Stremio.loadSettings().auth;          // { authKey } persisted
+    const loggedIn = acc && acc.authKey;
+
+    v.appendChild(el("h3", "sub", loggedIn ? "Stremio account" : "Login to Stremio"));
+    if (loggedIn) {
+      const row = el("div", "addonrow");
+      row.appendChild(el("span", "", "Logged in"));
+      row.appendChild(tile("Load my addons", "key", async () => {
+        try {
+          const list = await Stremio.accountAddons(acc.authKey);
+          settings.addons = list.map(Stremio.fromAccountAddon);
+          Stremio.saveSettings(settings);
+          hudMsg("Loaded " + list.length + " addons.", 2500);
+          show("settings");
+        } catch (e) { hudMsg("Addons failed: " + e.message, 4000); }
+      }));
+      row.appendChild(tile("Log out", "key", () => {
+        settings.auth = null; Stremio.saveSettings(settings); show("settings");
+      }));
+      v.appendChild(row);
+    } else {
+      const mail = el("input", "searchbox");
+      mail.placeholder = "stremio email";
+      const pass = el("input", "searchbox");
+      pass.placeholder = "password  (or leave empty → AuthKey mode)";
+      const keyIn = el("input", "searchbox");
+      keyIn.placeholder = "AuthKey (from web.stremio.com console)";
+      v.append(mail, pass, keyIn);
+      v.appendChild(keypad(mail, () => {}));
+      v.appendChild(keypad(pass, () => {}));
+      v.appendChild(keypad(keyIn, () => {}));
+      v.appendChild(tile("Login", "bigbtn", async () => {
+        try {
+          let authKey = keyIn.value.trim();
+          if (!authKey) {
+            const r = await Stremio.accountLogin(mail.value.trim(), pass.value);
+            authKey = r.authKey;
+          }
+          settings.auth = { authKey: authKey };
+          Stremio.saveSettings(settings);
+          hudMsg("Logged in. Loading addons…", 2500);
+          const list = await Stremio.accountAddons(authKey);
+          settings.addons = list.map(Stremio.fromAccountAddon);
+          Stremio.saveSettings(settings);
+          hudMsg("Logged in, " + list.length + " addons loaded.", 2500);
+          show("settings");
+        } catch (e) { hudMsg(e.message, 4000); }
+      }));
+    }
+
     v.appendChild(el("h3", "sub", "Addons"));
     const alist = el("div", "addonlist");
     for (const a of settings.addons) {

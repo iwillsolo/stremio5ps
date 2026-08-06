@@ -126,3 +126,12 @@ body {
 .addonrow { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 8px 0; }
 .addonrow span { font-size: 19px; color: var(--dim); overflow-wrap: anywhere; }
 .hint { color: var(--dim); font-size: 19px; }
+#gpad-cursor {
+  position: fixed; left: 0; top: 0;
+  width: 30px; height: 30px; margin: -15px 0 0 -15px;
+  border: 3px solid #fff; border-radius: 50%;
+  background: rgba(255, 255, 255, .22);
+  box-shadow: 0 0 10px rgba(0,0,0,.8);
+  pointer-events: none; z-index: 9999; display: none;
+}
+#gpad-cursor.on { display: block; }
