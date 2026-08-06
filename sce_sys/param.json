@@ -7,5 +7,5 @@
       "titleName": "Stremio"
     }
   },
-  "webAppUri": "https://iwillsolo.github.io/stremio5ps"
+  "webAppUri": "http://192.168.1.5:9001/"
 }
