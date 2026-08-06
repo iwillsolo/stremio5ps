@@ -405,14 +405,18 @@ const App = (() => {
     } else {
       const mail = el("input", "searchbox");
       mail.placeholder = "stremio email";
+      mail.setAttribute("data-focus", "");
+
       const pass = el("input", "searchbox");
-      pass.placeholder = "password  (or leave empty → AuthKey mode)";
+      pass.placeholder = "password";
+      pass.type = "password";
+      pass.setAttribute("data-focus", "");
+
       const keyIn = el("input", "searchbox");
       keyIn.placeholder = "AuthKey (from web.stremio.com console)";
+      keyIn.setAttribute("data-focus", "");
+
       v.append(mail, pass, keyIn);
-      v.appendChild(keypad(mail, () => {}));
-      v.appendChild(keypad(pass, () => {}));
-      v.appendChild(keypad(keyIn, () => {}));
       v.appendChild(tile("Login", "bigbtn", async () => {
         try {
           let authKey = keyIn.value.trim();
